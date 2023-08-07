@@ -54,7 +54,7 @@ trait CommandLock
 				return false;
 			}
 
-			rmdir($pathName);
+			self::rmdir($pathName);
 		}
 
 		if (FileSystem::createDirAtomically($pathName)) {
@@ -62,7 +62,7 @@ trait CommandLock
 				return true;
 			}
 
-			rmdir($pathName);
+			self::rmdir($pathName);
 		}
 
 		throw new Exception('CommandLock: Failed to create lock');
@@ -79,7 +79,7 @@ trait CommandLock
 	{
 		$pathName = $this->getPath($identifier);
 
-		if (!file_exists($pathName) || rmdir($pathName)) {
+		if (!file_exists($pathName) || self::rmdir($pathName)) {
 			return true;
 		}
 
@@ -107,5 +107,11 @@ trait CommandLock
 	private static function getFullName($name, $identifier): string
 	{
 		return $name . (is_string($identifier) ? "-$identifier" : '');
+	}
+
+	private static function rmdir(string $path)
+	{
+		@unlink($path . '/pid');
+		return @rmdir($path);
 	}
 }
