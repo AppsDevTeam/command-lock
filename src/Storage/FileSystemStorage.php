@@ -27,8 +27,14 @@ class FileSystemStorage implements Storage
 		$pidFilePath =  $pathName . '/pid';
 
 		if (file_exists($pathName)) {
-			// If pgid can be retrieved, the process that owned the lock is still running
-			if (posix_getpgid((int) file_get_contents($pidFilePath)) !== false) {
+			// A lock whose pid file is missing or unreadable is orphaned and must be
+			// treated as stale. Reading a missing pid gives (int) false = 0, and
+			// posix_getpgid(0) returns the current process group, so the lock looked
+			// permanently held and the command silently ended on exit(0) forever.
+			$pid = is_file($pidFilePath) ? (int) file_get_contents($pidFilePath) : 0;
+
+			// The process that owned the lock is still running.
+			if ($pid > 0 && posix_getpgid($pid) !== false) {
 				return false;
 			}
 
