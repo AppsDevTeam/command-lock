@@ -7,6 +7,8 @@ use Exception;
 
 class FileSystemStorage implements Storage
 {
+	private const PIDLESS_LOCK_TTL = 10;
+
 	private string $dir;
 	
 	public function __construct(string $dir)
@@ -31,10 +33,17 @@ class FileSystemStorage implements Storage
 			// treated as stale. Reading a missing pid gives (int) false = 0, and
 			// posix_getpgid(0) returns the current process group, so the lock looked
 			// permanently held and the command silently ended on exit(0) forever.
-			$pid = is_file($pidFilePath) ? (int) file_get_contents($pidFilePath) : 0;
+			$pid = is_file($pidFilePath) ? (int) @file_get_contents($pidFilePath) : 0;
 
 			// The process that owned the lock is still running.
 			if ($pid > 0 && posix_getpgid($pid) !== false) {
+				return false;
+			}
+
+			// Another process may have just created the lock directory and not yet
+			// written its pid. Removing the lock in that window would let both
+			// processes run, so only a pid-less lock older than this is stale.
+			if ($pid === 0 && time() - (int) @filemtime($pathName) < self::PIDLESS_LOCK_TTL) {
 				return false;
 			}
 
