@@ -49,4 +49,4 @@ Child processes inherit the lock: a process started from the locked command (`ex
 
 The locks directory and the lock files are created with permissions `0770` and `0660` regardless of umask, so processes of different users sharing a group can use the same locks. Set the setgid bit on the locks directory (`chmod g+s`) to make new files inherit its group.
 
-`flock()` is local to one kernel – do not put the locks directory on NFS or another network filesystem.
+A shared locks directory locks across hosts only if its filesystem forwards `flock()` to a common lock server. GlusterFS mounted via FUSE does: a lock taken on one host blocks the same command on the other hosts, a released or killed holder frees it for them immediately (tested on Gluster 11.1, replica 3 arbiter 1, also from a docker container with a bind mount). When a host crashes without closing its connection, Gluster releases its locks only after `network.ping-timeout` (42 s by default). NFS depends on the version and the lock daemon – verify it before relying on it.
