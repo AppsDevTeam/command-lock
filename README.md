@@ -1,45 +1,42 @@
 # command-lock
 
+Extend `LockedCommand` and implement `executeCommand()` instead of `execute()`. A second run of
+the same command while the first one is still running ends right away with exit code 0, so a
+cron job just skips a run.
+
 ```php
+namespace App\Console\Commands;
 
-namespace App\Commands;
-
-use ADT\CommandLock\CommandLock;
-use ADT\CommandLock\Storage\FileSystemStorage;
-use Exception;
+use ADT\CommandLock\LockedCommand;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-abstract class Command extends \Symfony\Component\Console\Command\Command
+#[AsCommand(name: 'app:import')]
+class ImportCommand extends LockedCommand
 {
-	use CommandLock;
-
-	private string $locksDir;
-
-	abstract protected function executeCommand(InputInterface $input, OutputInterface $output): int;
-
-	public function setLocksDir(string $locksDir)
+	protected function executeCommand(InputInterface $input, OutputInterface $output): int
 	{
-		$this->locksDir = $locksDir;
-	}
-
-	/**
-	 * @throws Exception
-	 */
-	protected function execute(InputInterface $input, OutputInterface $output): int
-	{
-		$this->setStorage(new FileSystemStorage($this->locksDir));
-
-		$this->lock();
-
-		$status = $this->executeCommand($input, $output);
-
-		$this->unlock();
-
-		return $status;
+		// ...
+		return self::SUCCESS;
 	}
 }
 ```
+
+The locks directory is set by the DI container, in Nette by a decorator:
+
+```neon
+decorator:
+	ADT\CommandLock\LockedCommand:
+		setup:
+			- setLocksDir(%rootDir%/data/locks)
+```
+
+The lock key is the name of the command; `setIdentifier()` replaces it (e.g. one lock per tenant).
+The lock is released also when `executeCommand()` throws.
+
+Another base class or another storage: use the `CommandLock` trait directly, `setStorage()`,
+then `lock()` and `unlock()` around the work.
 
 ## FileSystemStorage
 
